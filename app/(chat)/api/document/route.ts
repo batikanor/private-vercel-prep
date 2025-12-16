@@ -24,6 +24,10 @@ export async function GET(request: Request) {
     return new ChatSDKError("unauthorized:document").toResponse();
   }
 
+  if (!process.env.POSTGRES_URL) {
+    return Response.json([], { status: 200 });
+  }
+
   const documents = await getDocumentsById({ id });
 
   const [document] = documents;
@@ -54,6 +58,10 @@ export async function POST(request: Request) {
 
   if (!session?.user) {
     return new ChatSDKError("not_found:document").toResponse();
+  }
+
+  if (!process.env.POSTGRES_URL) {
+    return new ChatSDKError("offline:database").toResponse();
   }
 
   const {
@@ -107,6 +115,10 @@ export async function DELETE(request: Request) {
 
   if (!session?.user) {
     return new ChatSDKError("unauthorized:document").toResponse();
+  }
+
+  if (!process.env.POSTGRES_URL) {
+    return new ChatSDKError("offline:database").toResponse();
   }
 
   const documents = await getDocumentsById({ id });

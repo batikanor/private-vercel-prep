@@ -23,6 +23,10 @@ export async function GET(request: NextRequest) {
     return new ChatSDKError("unauthorized:chat").toResponse();
   }
 
+  if (!process.env.POSTGRES_URL) {
+    return Response.json([]);
+  }
+
   const chats = await getChatsByUserId({
     id: session.user.id,
     limit,
@@ -38,6 +42,10 @@ export async function DELETE() {
 
   if (!session?.user) {
     return new ChatSDKError("unauthorized:chat").toResponse();
+  }
+
+  if (!process.env.POSTGRES_URL) {
+    return Response.json({ ok: true }, { status: 200 });
   }
 
   const result = await deleteAllChatsByUserId({ userId: session.user.id });

@@ -93,18 +93,22 @@ export async function POST(request: Request) {
       return new ChatSDKError("unauthorized:chat").toResponse();
     }
 
+    const hasDatabase = Boolean(process.env.POSTGRES_URL);
+
     const userType: UserType = session.user.type;
 
-    const messageCount = await getMessageCountByUserId({
-      id: session.user.id,
-      differenceInHours: 24,
-    });
+    const messageCount = hasDatabase
+      ? await getMessageCountByUserId({
+          id: session.user.id,
+          differenceInHours: 24,
+        })
+      : 0;
 
     if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
       return new ChatSDKError("rate_limit:chat").toResponse();
     }
 
-    const chat = await getChatById({ id });
+    const chat = hasDatabase ? await getChatById({ id }) : null;
     let messagesFromDb: DBMessage[] = [];
     let titlePromise: Promise<string> | null = null;
 
@@ -115,13 +119,15 @@ export async function POST(request: Request) {
       // Only fetch messages if chat already exists
       messagesFromDb = await getMessagesByChatId({ id });
     } else {
-      // Save chat immediately with placeholder title
-      await saveChat({
-        id,
-        userId: session.user.id,
-        title: "New chat",
-        visibility: selectedVisibilityType,
-      });
+      if (hasDatabase) {
+        // Save chat immediately with placeholder title
+        await saveChat({
+          id,
+          userId: session.user.id,
+          title: "New chat",
+          visibility: selectedVisibilityType,
+        });
+      }
 
       // Start title generation in parallel (don't await)
       titlePromise = generateTitleFromUserMessage({ message });
@@ -138,28 +144,35 @@ export async function POST(request: Request) {
       country,
     };
 
-    await saveMessages({
-      messages: [
-        {
-          chatId: id,
-          id: message.id,
-          role: "user",
-          parts: message.parts,
-          attachments: [],
-          createdAt: new Date(),
-        },
-      ],
-    });
+    if (hasDatabase) {
+      await saveMessages({
+        messages: [
+          {
+            chatId: id,
+            id: message.id,
+            role: "user",
+            parts: message.parts,
+            attachments: [],
+            createdAt: new Date(),
+          },
+        ],
+      });
+    }
 
     const streamId = generateUUID();
-    await createStreamId({ streamId, chatId: id });
+
+    if (hasDatabase) {
+      await createStreamId({ streamId, chatId: id });
+    }
 
     const stream = createUIMessageStream({
       execute: ({ writer: dataStream }) => {
         // Handle title generation in parallel
         if (titlePromise) {
           titlePromise.then((title) => {
-            updateChatTitleById({ chatId: id, title });
+            if (hasDatabase) {
+              updateChatTitleById({ chatId: id, title });
+            }
             dataStream.write({ type: "data-chat-title", data: title });
           });
         }
@@ -216,6 +229,10 @@ export async function POST(request: Request) {
       },
       generateId: generateUUID,
       onFinish: async ({ messages }) => {
+        if (!hasDatabase) {
+          return;
+        }
+
         await saveMessages({
           messages: messages.map((currentMessage) => ({
             id: currentMessage.id,
@@ -277,6 +294,10 @@ export async function DELETE(request: Request) {
 
   if (!session?.user) {
     return new ChatSDKError("unauthorized:chat").toResponse();
+  }
+
+  if (!process.env.POSTGRES_URL) {
+    return Response.json({ ok: true }, { status: 200 });
   }
 
   const chat = await getChatById({ id });

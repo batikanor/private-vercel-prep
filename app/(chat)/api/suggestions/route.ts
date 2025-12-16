@@ -19,6 +19,10 @@ export async function GET(request: Request) {
     return new ChatSDKError("unauthorized:suggestions").toResponse();
   }
 
+  if (!process.env.POSTGRES_URL) {
+    return Response.json([], { status: 200 });
+  }
+
   const suggestions = await getSuggestionsByDocumentId({
     documentId,
   });

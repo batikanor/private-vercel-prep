@@ -19,6 +19,10 @@ export async function GET(request: Request) {
     return new ChatSDKError("unauthorized:vote").toResponse();
   }
 
+  if (!process.env.POSTGRES_URL) {
+    return Response.json([], { status: 200 });
+  }
+
   const chat = await getChatById({ id: chatId });
 
   if (!chat) {
@@ -53,6 +57,10 @@ export async function PATCH(request: Request) {
 
   if (!session?.user) {
     return new ChatSDKError("unauthorized:vote").toResponse();
+  }
+
+  if (!process.env.POSTGRES_URL) {
+    return new ChatSDKError("offline:database").toResponse();
   }
 
   const chat = await getChatById({ id: chatId });

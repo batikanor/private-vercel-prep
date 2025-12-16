@@ -34,6 +34,10 @@ export async function GET(
     return new ChatSDKError("unauthorized:chat").toResponse();
   }
 
+  if (!process.env.POSTGRES_URL) {
+    return new Response(null, { status: 204 });
+  }
+
   let chat: Chat | null;
 
   try {

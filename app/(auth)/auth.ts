@@ -4,6 +4,7 @@ import type { DefaultJWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
 import { DUMMY_PASSWORD } from "@/lib/constants";
 import { createGuestUser, getUser } from "@/lib/db/queries";
+import { generateUUID } from "@/lib/utils";
 import { authConfig } from "./auth.config";
 
 export type UserType = "guest" | "regular";
@@ -69,6 +70,14 @@ export const {
       id: "guest",
       credentials: {},
       async authorize() {
+        if (!process.env.POSTGRES_URL) {
+          return {
+            id: generateUUID(),
+            email: null,
+            type: "guest",
+          };
+        }
+
         const [guestUser] = await createGuestUser();
         return { ...guestUser, type: "guest" };
       },
