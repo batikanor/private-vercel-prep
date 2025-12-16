@@ -84,6 +84,24 @@ export const {
     }),
   ],
   callbacks: {
+    redirect({ url, baseUrl }) {
+      try {
+        // Allow relative callback URLs.
+        if (url.startsWith("/")) {
+          return `${baseUrl}${url}`;
+        }
+
+        // Allow same-origin absolute URLs only.
+        const parsed = new URL(url);
+        if (parsed.origin === baseUrl) {
+          return url;
+        }
+
+        return baseUrl;
+      } catch {
+        return baseUrl;
+      }
+    },
     jwt({ token, user }) {
       if (user) {
         token.id = user.id as string;
