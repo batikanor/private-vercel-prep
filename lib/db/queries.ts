@@ -37,9 +37,33 @@ import { generateHashedPassword } from "./utils";
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
 
-// biome-ignore lint: Forbidden non-null assertion.
-const client = postgres(process.env.POSTGRES_URL!);
-const db = drizzle(client);
+type DrizzleDb = ReturnType<typeof drizzle>;
+
+let cachedDb: DrizzleDb | null = null;
+
+function getDb(): DrizzleDb {
+  if (cachedDb) {
+    return cachedDb;
+  }
+
+  const postgresUrl = process.env.POSTGRES_URL;
+  if (!postgresUrl) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "POSTGRES_URL is not defined"
+    );
+  }
+
+  const client = postgres(postgresUrl);
+  cachedDb = drizzle(client);
+  return cachedDb;
+}
+
+const db = new Proxy({} as DrizzleDb, {
+  get(_target, prop) {
+    return (getDb() as any)[prop];
+  },
+});
 
 export async function getUser(email: string): Promise<User[]> {
   try {
