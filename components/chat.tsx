@@ -23,7 +23,12 @@ import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import type { Vote } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
-import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
+import {
+  fetcher,
+  fetchWithErrorHandlers,
+  generateUUID,
+  getMostRecentUserMessage,
+} from "@/lib/utils";
 import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
@@ -94,10 +99,19 @@ export function Chat({
       api: "/api/chat",
       fetch: fetchWithErrorHandlers,
       prepareSendMessagesRequest(request) {
+        const messageFromId = request.messageId
+          ? request.messages.find((m) => m.id === request.messageId)
+          : undefined;
+
+        const message =
+          messageFromId?.role === "user"
+            ? messageFromId
+            : getMostRecentUserMessage(request.messages);
+
         return {
           body: {
             id: request.id,
-            message: request.messages.at(-1),
+            message,
             selectedChatModel: currentModelIdRef.current,
             selectedVisibilityType: visibilityType,
             ...request.body,
